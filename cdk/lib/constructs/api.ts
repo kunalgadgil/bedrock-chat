@@ -234,7 +234,7 @@ export class Api extends Construct {
         assetExcludes: [...excludeDockerImage],
         buildArgs: { POETRY_VERSION: "1.8.3" },
       },
-      runtime: Runtime.PYTHON_3_12,
+      runtime: Runtime.PYTHON_3_13,
       architecture: Architecture.X86_64,
       memorySize: 1024,
       timeout: Duration.minutes(15),

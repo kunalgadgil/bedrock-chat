@@ -160,7 +160,7 @@ export class Auth extends Construct {
         this,
         "CheckEmailDomain",
         {
-          runtime: Runtime.PYTHON_3_12,
+          runtime: Runtime.PYTHON_3_13,
           index: "check_email_domain.py",
           entry: path.join(
             __dirname,
@@ -218,7 +218,7 @@ export class Auth extends Construct {
         this,
         "AddUserToGroups",
         {
-          runtime: Runtime.PYTHON_3_12,
+          runtime: Runtime.PYTHON_3_13,
           index: "add_user_to_groups.py",
           entry: path.join(
             __dirname,
@@ -259,7 +259,7 @@ export class Auth extends Construct {
           ),
           handler: "index.handler",
 
-          runtime: Runtime.PYTHON_3_12,
+          runtime: Runtime.PYTHON_3_13,
           environment: {
             USER_POOL_ID: userPool.userPoolId,
           },

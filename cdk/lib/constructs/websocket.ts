@@ -111,7 +111,7 @@ export class WebSocket extends Construct {
         assetExcludes: [...excludeDockerImage],
         buildArgs: { POETRY_VERSION: "1.8.3" },
       },
-      runtime: Runtime.PYTHON_3_12,
+      runtime: Runtime.PYTHON_3_13,
       memorySize: 512,
       timeout: Duration.minutes(15),
       environment: {
