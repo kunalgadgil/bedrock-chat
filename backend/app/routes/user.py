@@ -1,11 +1,12 @@
 from venv import logger
+
 from app.usecases.user import (
     get_user_by_id,
     search_group_by_name_prefix,
     search_user_by_email_prefix,
 )
 from app.user import User, UserGroup, UserWithoutGroups
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(tags=["user"])
 

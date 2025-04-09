@@ -80,7 +80,6 @@ export function generatePhysicalName(
     maxLength = 256,
     lower = false,
     separator = "",
-    allowedSpecialCharacters = undefined,
     destroyCreate = undefined,
     suppressWarnings = false,
     minUniqueNameLength = 5,
@@ -108,7 +107,7 @@ export function generatePhysicalName(
     );
     logWarning(
       `Prefix '${prefix}' (${originalLength} chars) truncated to '${truncatedPrefix}' (${truncatedPrefix.length} chars) ` +
-      `to fit within max length ${maxLength} while reserving ${minHashLength} chars for hash and ${minUniqueNameLength} chars for unique ID.`,
+        `to fit within max length ${maxLength} while reserving ${minHashLength} chars for hash and ${minUniqueNameLength} chars for unique ID.`,
       suppressWarnings
     );
     truncationOccurred = true;
@@ -116,7 +115,7 @@ export function generatePhysicalName(
 
   // First, get a unique name from CDK that includes stack information
   const cdkUniqueName = cdk.Names.uniqueId(scope);
-  
+
   // Create a unique hash using CDK's unique name and the full prefix
   // This ensures different resources get different hashes even with similar prefixes
   const uniqueInput = `${cdkUniqueName}:${prefix}`;
@@ -128,38 +127,35 @@ export function generatePhysicalName(
 
   // Combine parts
   const name = `${truncatedPrefix}${hash}${separator}${uniqueHash}`;
-  
+
   // Final safety check
   if (name.length > maxLength) {
     const originalName = name;
     // Further reduce prefix if needed
     const excessLength = name.length - maxLength;
-    const finalPrefix = truncatedPrefix.substring(0, Math.max(1, truncatedPrefix.length - excessLength));
+    const finalPrefix = truncatedPrefix.substring(
+      0,
+      Math.max(1, truncatedPrefix.length - excessLength)
+    );
     const finalName = `${finalPrefix}${hash}${separator}${uniqueHash}`;
-    
+
     logWarning(
       `Generated name '${originalName}' (${originalName.length} chars) exceeds maximum length of ${maxLength}. ` +
-      `Further adjusted to '${finalName}' (${finalName.length} chars).`,
+        `Further adjusted to '${finalName}' (${finalName.length} chars).`,
       suppressWarnings
     );
-    
+
     // If we had to do additional truncation, log the final name
     if (truncationOccurred) {
-      logWarning(
-        `Final resource name: '${finalName}'`,
-        suppressWarnings
-      );
+      logWarning(`Final resource name: '${finalName}'`, suppressWarnings);
     }
-    
+
     return lower ? finalName.toLowerCase() : finalName;
   }
 
   // Only log the final name if truncation occurred
   if (truncationOccurred) {
-    logWarning(
-      `Final resource name: '${name}'`,
-      suppressWarnings
-    );
+    logWarning(`Final resource name: '${name}'`, suppressWarnings);
   }
 
   return lower ? name.toLowerCase() : name;

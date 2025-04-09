@@ -599,7 +599,7 @@ class BotModel(BaseModel):
                 else None
             ),
             active_models=ActiveModelsModel.model_validate(
-                bot_input.active_models.model_dump()
+                bot_input.active_models.model_dump()  # type: ignore
             ),
             usage_stats=UsageStatsModel(usage_count=0),
         )
@@ -646,7 +646,7 @@ class BotModel(BaseModel):
                 else None
             ),
             active_models=ActiveModelsOutput.model_validate(
-                self.active_models.model_dump()
+                self.active_models.model_dump()  # type: ignore
             ),
         )
 
@@ -672,7 +672,7 @@ class BotModel(BaseModel):
             shared_scope=self.shared_scope,
             shared_status=self.shared_status,
             active_models=ActiveModelsOutput.model_validate(
-                self.active_models.model_dump()
+                self.active_models.model_dump()  # type: ignore
             ),
         )
 
@@ -774,7 +774,7 @@ class BotAliasModel(BaseModel):
             shared_scope=bot.shared_scope,  # Alias inherits shared scope from the original bot
             shared_status=bot.shared_status,  # Alias inherits shared status from the original bot
             active_models=ActiveModelsOutput.model_validate(
-                self.active_models.model_dump()
+                self.active_models.model_dump()  # type: ignore
             ),
         )
 

@@ -23,7 +23,11 @@ export const BotStoreLanguageSchema = z.enum([
  */
 const BaseParametersSchema = z.object({
   // CDK Environments
-  envName: z.string().default("default"),
+  envName: z
+    .string()
+    .max(10)
+    .regex(/^$|^[a-zA-Z][a-zA-Z0-9]*$/)
+    .default("default"),
   envPrefix: z.string().default(""),
 
   // Bedrock configuration

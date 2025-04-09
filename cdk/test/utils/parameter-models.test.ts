@@ -18,6 +18,101 @@ function createTestApp(context = {}) {
   });
 }
 
+describe("BaseParametersSchema", () => {
+  describe("Parameter Validation", () => {
+    describe("envName", () => {
+      // set any values for required fields
+      const commonParams = {
+        bedrockRegion: "eu-west-1",
+      };
+
+      test("should not throw ZodError when not set", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).not.toThrow();
+      });
+
+      test("should not throw ZodError when set 10 characters and Upper case at first character", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "Env4567890",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).not.toThrow();
+      });
+
+      test("should not throw ZodError when lower case at first character", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "env",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).not.toThrow();
+      });
+
+      test("should throw ZodError when set 11 characters", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "env45678901",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).toThrow();
+      });
+
+      test("should throw ZodError when set number at first character", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "1env",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).toThrow();
+      });
+
+      test("should throw ZodError when set non-alphanumeric character", () => {
+        // Given
+        const app = createTestApp();
+        const inputParams = {
+          ...commonParams,
+          envName: "!",
+        };
+
+        // When/Then
+        expect(() => {
+          resolveBedrockChatParameters(app, inputParams);
+        }).toThrow();
+      });
+    });
+  });
+});
+
 describe("resolveBedrockChatParameters", () => {
   describe("Parameter Source Selection", () => {
     test("should use parametersInput when provided", () => {
@@ -589,7 +684,7 @@ describe("resolveBedrockCustomBotParameters", () => {
       const originalEnv = process.env;
       process.env = {
         ...originalEnv,
-        ENV_NAME: "test-env",
+        ENV_NAME: "testEnv",
         ENV_PREFIX: "test-prefix",
         BEDROCK_REGION: "us-east-1",
         PK: "env-pk",
@@ -607,7 +702,7 @@ describe("resolveBedrockCustomBotParameters", () => {
 
         // Then
         expect(result.bedrockRegion).toBe("us-east-1");
-        expect(result.envName).toBe("test-env");
+        expect(result.envName).toBe("testEnv");
         expect(result.envPrefix).toBe("test-prefix");
         expect(result.pk).toBe("env-pk");
         expect(result.sk).toBe("env-sk");

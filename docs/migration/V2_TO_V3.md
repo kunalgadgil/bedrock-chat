@@ -8,6 +8,7 @@
 - Run the migration script to convert your data to the new schema
 - All your bots and conversations will be preserved with the new permission model
 - **IMPORTANT: During the migration process, the application will be unavailable to all users until the migration is complete. This process typically takes around 60 minutes, depending on the amount of data and the performance of your development environment.**
+- **IMPORTANT: All Published APIs must be deleted during the migration process.**
 - **WARNING: The migration process cannot guarantee 100% success for all bots. Please document your important bot configurations before migration in case you need to recreate them manually**
 
 ## Introduction

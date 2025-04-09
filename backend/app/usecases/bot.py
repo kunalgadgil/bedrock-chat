@@ -267,7 +267,7 @@ def modify_owned_bot(
             else None
         ),
         active_models=ActiveModelsOutput.model_validate(
-            modify_input.active_models.model_dump()
+            modify_input.active_models.model_dump()  # type: ignore
         ),
     )
 
@@ -314,7 +314,7 @@ def modify_owned_bot(
             else None
         ),
         active_models=ActiveModelsOutput.model_validate(
-            modify_input.active_models.model_dump()
+            modify_input.active_models.model_dump()  # type: ignore
         ),
     )
 

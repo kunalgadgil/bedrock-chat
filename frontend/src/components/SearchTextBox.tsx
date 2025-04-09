@@ -25,6 +25,8 @@ const SearchTextBox: React.FC<Props> = (props) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  const { suggestions, onSelect, onChange } = props;
+
   // Debounce for search
   const debouncedSearch = useDebouncedCallback((searchText: string) => {
     props.onSearch(searchText);
@@ -34,10 +36,10 @@ const SearchTextBox: React.FC<Props> = (props) => {
   const handleInputChange = useCallback(
     (value: string) => {
       setInputValue(value);
-      props.onChange(value);
+      onChange(value);
       debouncedSearch(value);
     },
-    [props.onChange, debouncedSearch]
+    [onChange, debouncedSearch]
   );
 
   useEffect(() => {
@@ -62,27 +64,27 @@ const SearchTextBox: React.FC<Props> = (props) => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!props.suggestions?.length) {
+      if (!suggestions?.length) {
         return;
       }
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((prev) =>
-          prev < props.suggestions!.length - 1 ? prev + 1 : prev
+          prev < suggestions!.length - 1 ? prev + 1 : prev
         );
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
       } else if (e.key === 'Enter' && selectedIndex >= 0) {
         e.preventDefault();
-        props.onSelect(props.suggestions[selectedIndex]);
+        onSelect(suggestions[selectedIndex]);
         setIsFocused(false);
       } else if (e.key === 'Escape') {
         setIsFocused(false);
       }
     },
-    [props, selectedIndex]
+    [suggestions, onSelect, selectedIndex]
   );
 
   useEffect(() => {
@@ -98,7 +100,7 @@ const SearchTextBox: React.FC<Props> = (props) => {
     <div className="relative">
       <div
         className={twMerge(
-          'dark:bg-aws-ui-color-dark flex items-center rounded border bg-white',
+          'flex items-center rounded border bg-white dark:bg-aws-ui-color-dark',
           props.disabled
             ? 'border-aws-font-color-light/30 dark:border-aws-font-color-dark/30'
             : 'border-aws-font-color-light/50 dark:border-aws-font-color-dark/50'
@@ -112,7 +114,7 @@ const SearchTextBox: React.FC<Props> = (props) => {
           ref={inputRef}
           type="text"
           className={twMerge(
-            'dark:text-aws-font-color-dark dark:placeholder-aws-font-color-gray w-full bg-transparent p-2 outline-none',
+            'w-full bg-transparent p-2 outline-none dark:text-aws-font-color-dark dark:placeholder-aws-font-color-gray',
             props.disabled && 'cursor-not-allowed'
           )}
           value={inputValue}
@@ -136,21 +138,21 @@ const SearchTextBox: React.FC<Props> = (props) => {
         )}
       </div>
 
-      {isFocused && props.suggestions && props.suggestions.length > 0 && (
+      {isFocused && suggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="border-aws-font-color-light/50 dark:border-aws-font-color-dark/50 dark:bg-aws-ui-color-dark absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded border bg-white shadow-lg">
-          {props.suggestions.map((suggestion, index) => (
+          className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded border border-aws-font-color-light/50 bg-white shadow-lg dark:border-aws-font-color-dark/50 dark:bg-aws-ui-color-dark">
+          {suggestions.map((suggestion, index) => (
             <div
               id={`suggestion-${index}`}
               key={index}
               className={twMerge(
-                'hover:bg-aws-sea-blue-hover-light dark:hover:bg-aws-paper-dark cursor-pointer px-4 py-2',
+                'cursor-pointer px-4 py-2 hover:bg-aws-sea-blue-hover-light dark:hover:bg-aws-paper-dark',
                 selectedIndex === index &&
                   'bg-aws-sea-blue-hover-light dark:bg-aws-paper-dark'
               )}
               onClick={() => {
-                props.onSelect(suggestion);
+                onSelect(suggestion);
                 setIsFocused(false);
               }}>
               {suggestion}

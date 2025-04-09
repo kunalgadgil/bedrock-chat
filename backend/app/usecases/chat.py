@@ -7,9 +7,8 @@ from app.agents.utils import get_tools
 from app.bedrock import (
     call_converse_api,
     compose_args_for_converse_api,
-    is_not_tooluse_supported,
+    is_tooluse_supported,
 )
-from app.bedrock import call_converse_api, compose_args_for_converse_api
 from app.prompt import build_rag_prompt, get_prompt_to_cite_tool_results
 from app.repositories.conversation import (
     RecordNotFoundError,
@@ -218,7 +217,7 @@ def chat(
 
     # # Set tools only when tooluse is supported
     tools: Dict[str, AgentTool] = {}
-    if not is_not_tooluse_supported(chat_input.message.model):
+    if is_tooluse_supported(chat_input.message.model):
         tools = get_tools(bot)
 
     display_citation = bot is not None and bot.display_retrieved_chunks
@@ -237,9 +236,7 @@ def chat(
     related_documents: list[RelatedDocumentModel] = []
     search_results: list[SearchResult] = []
     if bot is not None:
-        if bot.is_agent_enabled() and not is_not_tooluse_supported(
-            chat_input.message.model
-        ):
+        if bot.is_agent_enabled() and is_tooluse_supported(chat_input.message.model):
             # If it have a knowledge base, always process it in agent mode
             if bot.has_knowledge():
                 # Add knowledge tool
@@ -252,22 +249,23 @@ def chat(
                         model=chat_input.message.model,
                     )
                 )
-        elif bot.has_knowledge() and is_not_tooluse_supported(chat_input.message.model):
+        elif bot.has_knowledge() and not is_tooluse_supported(chat_input.message.model):
             # Fetch most related documents from vector store
             # NOTE: Currently embedding not support multi-modal. For now, use the last content.
             content = conversation.message_map[user_msg_id].content[-1]
             if isinstance(content, TextContentModel):
                 pseudo_tool_use_id = "new-message-assistant"
 
-                on_thinking(
-                    {
-                        "tool_use_id": pseudo_tool_use_id,
-                        "name": "knowledge_base_tool",
-                        "input": {
-                            "query": content.body,
-                        },
-                    }
-                )
+                if on_thinking:
+                    on_thinking(
+                        {
+                            "tool_use_id": pseudo_tool_use_id,
+                            "name": "knowledge_base_tool",
+                            "input": {
+                                "query": content.body,
+                            },
+                        }
+                    )
 
                 search_results = search_related_docs(bot=bot, query=content.body)
                 logger.info(f"Search results from vector store: {search_results}")

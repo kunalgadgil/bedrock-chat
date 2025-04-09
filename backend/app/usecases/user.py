@@ -16,5 +16,5 @@ def search_group_by_name_prefix(prefix: str) -> list[UserGroup]:
     return find_group_by_name_prefix(prefix=prefix)
 
 
-def get_user_by_id(id: str) -> UserWithoutGroups:
+def get_user_by_id(id: str) -> UserWithoutGroups | None:
     return find_user_by_id(id=id)
