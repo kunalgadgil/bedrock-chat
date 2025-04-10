@@ -700,6 +700,7 @@ class ConversationModel(BaseModel):
 
 class SearchHighlight(BaseModel):
     """Model representing highlight information for search results"""
+
     field_name: str
     fragments: list[str]
 
@@ -711,12 +712,12 @@ class ConversationMeta(BaseModel):
     model: str
     bot_id: str | None
     highlights: list[SearchHighlight] | None = None
-    
+
     @classmethod
     def from_opensearch_response(cls, hit: dict) -> Self:
         """Create a ConversationMeta instance from OpenSearch response"""
         source = hit["_source"]
-        
+
         # Extract conversation ID from SK (e.g. "{user_id}#CONV#{conversation_id}" -> "{conversation_id}")
         sk = source.get("SK", "")
         conversation_id = sk.split("#CONV#")[1]
@@ -726,7 +727,7 @@ class ConversationMeta(BaseModel):
         try:
             message_map_str = source.get("MessageMap", "{}")
             message_map = json.loads(message_map_str)
-            
+
             # Try to get model from system message first
             if "system" in message_map and "model" in message_map["system"]:
                 model = message_map["system"]["model"]
@@ -740,38 +741,36 @@ class ConversationMeta(BaseModel):
         except (json.JSONDecodeError, TypeError):
             # In case of any error during JSON parsing, default to empty string
             model = ""
-        
+
         # Create conversation meta instance
         conversation = cls(
             id=conversation_id,
             title=source.get("Title", "Untitled conversation"),
             create_time=float(source.get("CreateTime", 0)),
             model=model,
-            bot_id=source.get("BotId")
+            bot_id=source.get("BotId"),
         )
 
-         # Add highlight information if available
+        # Add highlight information if available
         if "highlight" in hit:
             highlights = []
             for field, fragments in hit["highlight"].items():
                 if field.startswith("ParsedMessageMap.") and field.endswith(".body"):
                     highlights.append(
-                        SearchHighlight(
-                            field_name="MessageBody",
-                            fragments=fragments
-                        )
+                        SearchHighlight(field_name="MessageBody", fragments=fragments)
+                    )
+                elif field.startswith("ParsedMessageMap.") and field.endswith(".text"):
+                    highlights.append(
+                        SearchHighlight(field_name="MessageBody", fragments=fragments)
                     )
                 elif field == "Title":
                     highlights.append(
-                        SearchHighlight(
-                            field_name=field,
-                            fragments=fragments
-                        )
+                        SearchHighlight(field_name=field, fragments=fragments)
                     )
-            
+
             if highlights:
                 conversation.highlights = highlights
-        
+
         return conversation
 
 

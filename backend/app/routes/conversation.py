@@ -5,7 +5,7 @@ from app.repositories.conversation import (
     find_conversation_by_user_id,
     find_related_document_by_id,
     find_related_documents_by_conversation_id,
-    update_feedback
+    update_feedback,
 )
 from app.repositories.conversation_search import find_conversations_by_query
 from app.repositories.models.conversation import FeedbackModel
@@ -19,7 +19,7 @@ from app.routes.schemas.conversation import (
     NewTitleInput,
     ProposedTitle,
     RelatedDocument,
-    SearchHighlight as SchemaSearchHighlight
+    SearchHighlight as SchemaSearchHighlight,
 )
 from app.usecases.chat import (
     chat,
@@ -123,36 +123,30 @@ def get_all_conversations(
 
 
 @router.delete("/conversations")
-def remove_all_conversations(
-    request: Request
-):
+def remove_all_conversations(request: Request):
     """Delete all conversations"""
     delete_conversation_by_user_id(request.state.current_user.id)
 
 
 @router.get("/conversations/search", response_model=list[ConversationMetaOutput])
-def search_conversations(
-    request: Request,
-    query: str
-):
+def search_conversations(request: Request, query: str):
     """Search conversations by keyword"""
     current_user: User = request.state.current_user
 
     conversations = find_conversations_by_query(query, current_user)
     output = []
-    
+
     for conversation in conversations:
         # Convert model SearchHighlight to schema SearchHighlight
         schema_highlights = None
         if conversation.highlights:
             schema_highlights = [
                 SchemaSearchHighlight(
-                    field_name=highlight.field_name,
-                    fragments=highlight.fragments
+                    field_name=highlight.field_name, fragments=highlight.fragments
                 )
                 for highlight in conversation.highlights
             ]
-        
+
         # Create ConversationMetaOutput with properly converted highlights
         output.append(
             ConversationMetaOutput(
@@ -161,10 +155,10 @@ def search_conversations(
                 create_time=conversation.create_time,
                 model=conversation.model,
                 bot_id=conversation.bot_id,
-                highlights=schema_highlights
+                highlights=schema_highlights,
             )
         )
-    
+
     return output
 
 

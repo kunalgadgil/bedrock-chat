@@ -213,6 +213,7 @@ class RelatedDocument(BaseSchema):
 
 class SearchHighlight(BaseSchema):
     """Schema representing highlight information for search results"""
+
     field_name: str
     fragments: list[str]
 

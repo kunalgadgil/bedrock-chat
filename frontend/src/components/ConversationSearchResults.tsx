@@ -13,7 +13,7 @@ type ConversationItemProps = {
 
 // Helper function to highlight search terms in the text
 const highlightSearchTerms = (text: string, searchQuery: string): string => {
-  if (!searchQuery.trim()) return text;
+  if (!searchQuery.trim()) {return text;}
   
   // Escape special characters in the search query
   const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
