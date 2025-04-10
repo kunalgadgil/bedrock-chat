@@ -22,7 +22,7 @@ const highlightSearchTerms = (text: string, searchQuery: string): string => {
   const regex = new RegExp(`(${escapedQuery})`, 'gi');
   
   // Replace matches with highlighted version
-  return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>');
+  return text.replace(regex, '<mark class="bg-light-yellow dark:bg-yellow">$1</mark>');
 };
 
 export const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onClick, searchQuery }) => {
@@ -51,13 +51,13 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({ conversation
             {highlight.fragments.map((fragment, fragmentIndex) => (
               <div 
                 key={fragmentIndex} 
-                className="text-sm text-gray-600 dark:text-gray-300 p-1 border-l-2 border-gray-300 mt-1 line-clamp-2"
+                className="text-sm text-dark-gray dark:text-gray p-1 border-l-2 border-gray mt-1 line-clamp-2"
               >
                 <span 
                   dangerouslySetInnerHTML={{ 
                     __html: `...${fragment}...`
                   }}
-                  className="[&_em]:bg-yellow-200 [&_em]:dark:bg-yellow-800"
+                  className="[&_em]:bg-light-yellow [&_em]:dark:bg-yellow"
                 />
               </div>
             ))}
