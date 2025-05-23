@@ -83,6 +83,20 @@ const useModel = (botId?: string | null, activeModels?: ActiveModels) => {
   >(() => {
     return [
       {
+        modelId: 'claude-v4-opus',
+        label: t('model.claude-v4-opus.label'),
+        description: t('model.claude-v4-opus.description'),
+        supportMediaType: CLAUDE_SUPPORTED_MEDIA_TYPES,
+        supportReasoning: true,
+      },
+      {
+        modelId: 'claude-v4-sonnet',
+        label: t('model.claude-v4-sonnet.label'),
+        description: t('model.claude-v4-sonnet.description'),
+        supportMediaType: CLAUDE_SUPPORTED_MEDIA_TYPES,
+        supportReasoning: true,
+      },
+      {
         modelId: 'claude-v3-haiku',
         label: t('model.claude-v3-haiku.label'),
         description: t('model.claude-v3-haiku.description'),

@@ -17,6 +17,16 @@ const translation = {
       userGroups: 'User Groups',
     },
     model: {
+      'claude-v4-opus': {
+        label: 'Claude 4 (Opus)',
+        description:
+          'Most powerful hybrid reasoning model for complex tasks, coding, and AI agents with 200K token context window.',
+      },
+      'claude-v4-sonnet': {
+        label: 'Claude 4 (Sonnet)',
+        description:
+          'Balanced hybrid reasoning model optimized for efficiency at scale with 200K token context window.',
+      },
       'claude-v3-haiku': {
         label: 'Claude 3 (Haiku)',
         description:

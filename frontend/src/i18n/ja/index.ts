@@ -20,6 +20,16 @@ const translation: typeof en = {
       backChat: 'チャットに戻る',
     },
     model: {
+      'claude-v4-opus': {
+        label: 'Claude 4 (Opus)',
+        description:
+          '複雑なタスク、コーディング、AIエージェント向けの最も強力なハイブリッド推論モデル（200Kトークンコンテキストウィンドウ）',
+      },
+      'claude-v4-sonnet': {
+        label: 'Claude 4 (Sonnet)',
+        description:
+          '効率性とスケールを最適化したバランスの取れたハイブリッド推論モデル（200Kトークンコンテキストウィンドウ）',
+      },
       'claude-v3-haiku': {
         label: 'Claude 3 (Haiku)',
         description:
