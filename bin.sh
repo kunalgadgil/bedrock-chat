@@ -47,7 +47,7 @@ DISABLE_IPV6="false"
 ALLOWED_SIGN_UP_EMAIL_DOMAINS=""
 BEDROCK_REGION="us-east-1"
 CDK_JSON_OVERRIDE="{}"
-REPO_URL="https://github.com/aws-samples/bedrock-chat.git"
+REPO_URL="https://github.com/kunalgadgil/bedrock-chat.git"
 VERSION="v3"
 
 # Parse command-line arguments for customization
