@@ -57,6 +57,32 @@ export class WebAclForPublishedApi extends Construct {
         },
       });
     }
+
+    // Add rule to allow all traffic to Slack webhook endpoints
+    rules.push({
+      priority: 2,
+      name: "AllowSlackWebhooks",
+      action: { allow: {} },
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: "SlackWebhookRule",
+        sampledRequestsEnabled: true,
+      },
+      statement: {
+        byteMatchStatement: {
+          fieldToMatch: { uriPath: {} },
+          positionalConstraint: "STARTS_WITH",
+          searchString: "/api/slack",
+          textTransformations: [
+            {
+              priority: 0,
+              type: "LOWERCASE",
+            },
+          ],
+        },
+      },
+    });
+
     if (rules.length > 0) {
       const webAcl = new wafv2.CfnWebACL(this, "WebAcl", {
         defaultAction: { block: {} },

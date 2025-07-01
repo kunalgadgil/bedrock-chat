@@ -54,6 +54,7 @@ async def handle_slack_events(request: Request, background_tasks: BackgroundTask
     body_str = body.decode('utf-8')
 
     print(f"Received Slack webhook: {body_str}")
+    print(f"Request headers: {dict(request.headers)}")
 
     # ALWAYS verify Slack signature first (for all requests including URL verification)
     if not verify_slack_signature(body_str, dict(request.headers)):

@@ -150,11 +150,11 @@ export class ApiPublishmentStack extends Stack {
     chatQueue.grantSendMessages(apiHandler);
     chatQueue.grantConsumeMessages(sqsConsumeHandler);
 
-    // Main API Gateway for regular endpoints (with WAF protection and API key required)
+    // Main API Gateway with mixed authentication requirements
     const api = new apigateway.LambdaRestApi(this, "Api", {
       restApiName: id,
       handler: apiHandler,
-      proxy: true,
+      proxy: false, // Disable proxy to allow custom resource configuration
       deployOptions: {
         stageName: deploymentStage,
       },
@@ -162,25 +162,39 @@ export class ApiPublishmentStack extends Stack {
       defaultCorsPreflightOptions: props.corsOptions,
     });
 
-    // Separate API Gateway for Slack webhooks (without WAF protection and no API key required)
-    const slackApi = new apigateway.LambdaRestApi(this, "SlackApi", {
-      restApiName: `${id}-Slack`,
-      handler: apiHandler,
-      proxy: false,
-      deployOptions: {
-        stageName: deploymentStage,
-      },
-      defaultMethodOptions: { apiKeyRequired: false },
-      defaultCorsPreflightOptions: props.corsOptions,
+    // Add regular API endpoints (with API key required)
+    const healthResource = api.root.addResource("health");
+    healthResource.addMethod("GET", new apigateway.LambdaIntegration(apiHandler), {
+      apiKeyRequired: true,
     });
 
-    // Add Slack webhook resources to the separate API
-    const slackResource = slackApi.root.addResource("slack");
+    const conversationResource = api.root.addResource("conversation");
+    conversationResource.addMethod("POST", new apigateway.LambdaIntegration(apiHandler), {
+      apiKeyRequired: true,
+    });
+    conversationResource.addMethod("GET", new apigateway.LambdaIntegration(apiHandler), {
+      apiKeyRequired: true,
+    });
+
+    // Add conversation with ID resource
+    const conversationWithIdResource = conversationResource.addResource("{conversation_id}");
+    conversationWithIdResource.addMethod("GET", new apigateway.LambdaIntegration(apiHandler), {
+      apiKeyRequired: true,
+    });
+
+    // Add message resource
+    const messageResource = conversationWithIdResource.addResource("{message_id}");
+    messageResource.addMethod("GET", new apigateway.LambdaIntegration(apiHandler), {
+      apiKeyRequired: true,
+    });
+
+    // Add Slack webhook resources (WITHOUT API key requirement)
+    const slackResource = api.root.addResource("slack");
 
     // Slack events endpoint
     const slackEventsResource = slackResource.addResource("events");
     slackEventsResource.addMethod("POST", new apigateway.LambdaIntegration(apiHandler), {
-      apiKeyRequired: false,
+      apiKeyRequired: false, // No API key required for Slack webhooks
     });
 
     // Slack health endpoint
@@ -210,7 +224,10 @@ export class ApiPublishmentStack extends Stack {
     usagePlan.addApiKey(apiKey);
     usagePlan.addApiStage({ stage: api.deploymentStage });
 
-    // Apply WAF only to the main API Gateway (not the Slack API)
+    // Apply WAF to the API Gateway
+    // Note: Slack endpoints (/slack/*) are configured without API key requirements
+    // but will still be subject to WAF rules. If Slack requests are blocked by WAF,
+    // you may need to add Slack IP ranges to the WAF allowlist.
     const association = new wafv2.CfnWebACLAssociation(
       this,
       "WebAclAssociation",
@@ -221,8 +238,6 @@ export class ApiPublishmentStack extends Stack {
     );
     association.addDependency(api.node.defaultChild as cdk.CfnResource);
 
-    // Note: Slack API does not have WAF protection, allowing Slack webhooks to work without IP restrictions
-
     this.chatQueue = chatQueue;
 
     new CfnOutput(this, "ApiId", {
@@ -230,12 +245,6 @@ export class ApiPublishmentStack extends Stack {
     });
     new CfnOutput(this, "ApiName", {
       value: api.restApiName,
-    });
-    new CfnOutput(this, "SlackApiId", {
-      value: slackApi.restApiId,
-    });
-    new CfnOutput(this, "SlackApiName", {
-      value: slackApi.restApiName,
     });
     new CfnOutput(this, "ApiUsagePlanId", {
       value: usagePlan.usagePlanId,
@@ -247,8 +256,8 @@ export class ApiPublishmentStack extends Stack {
       value: deploymentStage,
     });
     new CfnOutput(this, "SlackWebhookUrl", {
-      value: `https://${slackApi.restApiId}.execute-api.${Stack.of(this).region}.amazonaws.com/${deploymentStage}/slack/events`,
-      description: "URL to use for Slack Event Subscriptions",
+      value: `https://${api.restApiId}.execute-api.${Stack.of(this).region}.amazonaws.com/${deploymentStage}/slack/events`,
+      description: "URL to use for Slack Event Subscriptions (No API key required)",
     });
   }
 }
