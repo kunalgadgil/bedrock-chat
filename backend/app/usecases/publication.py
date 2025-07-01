@@ -101,6 +101,8 @@ def create_bot_publication(user: User, bot_id: str, bot_publish_input: BotPublis
         environment_variables["SLACK_BOT_TOKEN"] = bot_publish_input.slack_bot_token
     if bot_publish_input.slack_signing_secret is not None:
         environment_variables["SLACK_SIGNING_SECRET"] = bot_publish_input.slack_signing_secret
+    if bot_publish_input.slack_model is not None:
+        environment_variables["SLACK_MODEL"] = bot_publish_input.slack_model
 
     # Create `ApiPublishmentStack` by CodeBuild
     try:

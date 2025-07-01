@@ -27,6 +27,7 @@ interface ApiPublishmentStackProps extends StackProps {
   readonly corsOptions?: apigateway.CorsOptions;
   readonly slackBotToken?: string;
   readonly slackSigningSecret?: string;
+  readonly slackModel?: string;
 }
 
 export class ApiPublishmentStack extends Stack {
@@ -105,6 +106,7 @@ export class ApiPublishmentStack extends Stack {
         // Slack integration environment variables
         SLACK_BOT_TOKEN: props.slackBotToken || "",
         SLACK_SIGNING_SECRET: props.slackSigningSecret || "",
+        SLACK_MODEL: props.slackModel || "amazon-nova-micro",
       },
       role: handlerRole,
       logRetention: logs.RetentionDays.THREE_MONTHS,

@@ -44,6 +44,7 @@ class BotPublishInput(BaseSchema):
     allowed_origins: list[str]
     slack_bot_token: str | None = Field(None, description="Slack Bot User OAuth Token for Slack integration")
     slack_signing_secret: str | None = Field(None, description="Slack App Signing Secret for webhook verification")
+    slack_model: str | None = Field(None, description="AI model to use for Slack responses (default: amazon-nova-micro)")
 
     @root_validator(pre=True)
     def validate_allowed_origins(cls, values):

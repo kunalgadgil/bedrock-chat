@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import boto3
 from app.routes.schemas.conversation import ChatInput, MessageInput
-from app.routes.schemas.published_api import ChatInputWithoutBotId
+from app.routes.schemas.published_api import ChatInputWithoutBotId, MessageInputWithoutMessageId
 from app.user import User
 from app.usecases.chat import fetch_conversation
 from fastapi import APIRouter, HTTPException, Request, Response, BackgroundTasks
@@ -22,6 +22,7 @@ router = APIRouter(tags=["slack_webhook"])
 # Environment variables
 SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN', '')
 SLACK_SIGNING_SECRET = os.environ.get('SLACK_SIGNING_SECRET', '')
+SLACK_MODEL = os.environ.get('SLACK_MODEL', 'amazon-nova-micro')
 
 sqs_client = boto3.client("sqs")
 QUEUE_URL = os.environ.get("QUEUE_URL", "")
@@ -103,6 +104,7 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
     text = event.get('text', '')
 
     print(f"Channel: {channel}, User: {user}, Text: {text}")
+    print(f"Using AI model: {SLACK_MODEL}")
 
     # Clean message text (remove bot mentions)
     cleaned_text = clean_message_text(text)
@@ -119,43 +121,55 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
         current_user.id.split("#")[1] if "#" in current_user.id else current_user.id
     )
 
-    # Create conversation ID based on Slack channel/user for context
-    conversation_id = f"slack-{channel}-{user}"
-
-    # Generate message ID
+    # Don't create conversation ID - let the system generate one
+    # Generate message ID for tracking
     response_message_id = str(ULID())
 
-    # Create chat input
-    chat_input = ChatInput(
-        conversation_id=conversation_id,
-        message=MessageInput(
-            role="user",
+    # Use the published API schema which doesn't require conversation_id
+    chat_input_without_bot = ChatInputWithoutBotId(
+        conversation_id=None,  # Let the system generate a new conversation
+        message=MessageInputWithoutMessageId(
             content=[
                 {
                     "contentType": "text",
                     "body": cleaned_text
                 }
             ],
-            model="amazon-nova-pro",  # You can make this configurable
-            parent_message_id=None,
-            message_id=response_message_id,
+            model=SLACK_MODEL,
         ),
-        bot_id=bot_id,
         continue_generate=False,
         enable_reasoning=False,
     )
 
     try:
+        # Follow the published API pattern: generate conversation ID if not provided
+        conversation_id = str(ULID())  # Generate new conversation ID (same as published API)
+
+        # Create ChatInput for SQS (same format as published API)
+        chat_input = ChatInput(
+            conversation_id=conversation_id,
+            message=MessageInput(
+                role="user",
+                content=chat_input_without_bot.message.content,
+                model=chat_input_without_bot.message.model,
+                parent_message_id=None,  # Use the latest message as the parent
+                message_id=response_message_id,
+            ),
+            bot_id=bot_id,
+            continue_generate=chat_input_without_bot.continue_generate,
+            enable_reasoning=chat_input_without_bot.enable_reasoning,
+        )
+
         # Send to SQS for processing (same as published API)
         _ = sqs_client.send_message(
             QueueUrl=QUEUE_URL, MessageBody=chat_input.model_dump_json()
         )
-        print(f"Sent message to SQS: {response_message_id}")
+        print(f"Sent message to SQS - Message ID: {response_message_id}, Conversation ID: {conversation_id}")
 
         # Send immediate response to Slack
-        await send_slack_response(channel, "🤔 Processing your request...")
+        await send_slack_response(channel, "Processing your request...")
 
-        # Store the context for later response
+        # Store the context for later response (use the generated conversation_id)
         store_slack_context(response_message_id, channel, conversation_id, user, bot_id)
 
         # Start background polling for this specific message
@@ -274,7 +288,7 @@ def store_slack_context(message_id: str, channel: str, conversation_id: str, use
 
 async def poll_for_response(message_id: str, conversation_id: str):
     """Poll for AI response and send it back to Slack"""
-    print(f"Starting polling for message {message_id}")
+    print(f"Starting polling for message {message_id} in conversation {conversation_id}")
 
     max_attempts = 60  # Poll for up to 60 seconds
     poll_interval = 1  # Poll every 1 second

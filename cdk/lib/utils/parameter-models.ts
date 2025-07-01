@@ -127,6 +127,7 @@ const ApiPublishParametersSchema = BaseParametersSchema.extend({
   publishedApiAllowedOrigins: z.string().default('["*"]'),
   slackBotToken: z.string().optional(),
   slackSigningSecret: z.string().optional(),
+  slackModel: z.string().optional(),
 });
 
 /**
@@ -303,6 +304,7 @@ export function resolveApiPublishParameters(): ApiPublishParameters {
     publishedApiAllowedOrigins: getEnvVar("PUBLISHED_API_ALLOWED_ORIGINS"),
     slackBotToken: getEnvVar("SLACK_BOT_TOKEN"),
     slackSigningSecret: getEnvVar("SLACK_SIGNING_SECRET"),
+    slackModel: getEnvVar("SLACK_MODEL"),
   };
 
   return ApiPublishParametersSchema.parse(envVars);

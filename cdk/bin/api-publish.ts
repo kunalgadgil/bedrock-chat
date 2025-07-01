@@ -50,6 +50,7 @@ new ApiPublishmentStack(app, `ApiPublishmentStack${params.publishedApiId}`, {
   largeMessageBucketName: largeMessageBucketName,
   slackBotToken: params.slackBotToken,
   slackSigningSecret: params.slackSigningSecret,
+  slackModel: params.slackModel,
   usagePlan: {
     throttle:
       params.publishedApiThrottleRateLimit !== undefined &&
