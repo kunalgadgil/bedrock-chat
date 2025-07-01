@@ -55,7 +55,7 @@ async def handle_slack_events(request: Request, background_tasks: BackgroundTask
 
     print(f"Received Slack webhook: {body_str}")
 
-    # Verify Slack signature
+    # ALWAYS verify Slack signature first (for all requests including URL verification)
     if not verify_slack_signature(body_str, dict(request.headers)):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
@@ -64,9 +64,10 @@ async def handle_slack_events(request: Request, background_tasks: BackgroundTask
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    # Handle URL verification challenge
+    # Handle URL verification challenge AFTER signature verification
     if slack_data.get('type') == 'url_verification':
         challenge = slack_data.get('challenge', '')
+        print(f"URL verification challenge: {challenge}")
         return Response(content=challenge, media_type="text/plain")
 
     # Handle event callbacks
@@ -134,7 +135,7 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
                     "body": cleaned_text
                 }
             ],
-            model="amazon-nova-micro",  # You can make this configurable
+            model="amazon-nova-pro",  # You can make this configurable
             parent_message_id=None,
             message_id=response_message_id,
         ),
@@ -209,12 +210,13 @@ def verify_slack_signature(body: str, headers: Dict[str, str]) -> bool:
             print("Warning: SLACK_SIGNING_SECRET not set, skipping verification")
             return True
         
-        # Get signature and timestamp from headers
-        slack_signature = headers.get('x-slack-signature', '')
-        slack_timestamp = headers.get('x-slack-request-timestamp', '')
+        # Get signature and timestamp from headers (case-insensitive)
+        slack_signature = headers.get('x-slack-signature') or headers.get('X-Slack-Signature', '')
+        slack_timestamp = headers.get('x-slack-request-timestamp') or headers.get('X-Slack-Request-Timestamp', '')
         
         if not slack_signature or not slack_timestamp:
-            print("Missing signature or timestamp")
+            print(f"Missing signature or timestamp. Signature: {bool(slack_signature)}, Timestamp: {bool(slack_timestamp)}")
+            print(f"Available headers: {list(headers.keys())}")
             return False
         
         # Check timestamp (prevent replay attacks)
@@ -237,10 +239,16 @@ def verify_slack_signature(body: str, headers: Dict[str, str]) -> bool:
             sig_basestring.encode(),
             hashlib.sha256
         ).hexdigest()
-        
+
         is_valid = hmac.compare_digest(my_signature, slack_signature)
+
+        # Debug logging
         print(f"Signature verification: {is_valid}")
-        
+        if not is_valid:
+            print(f"Expected signature: {my_signature}")
+            print(f"Received signature: {slack_signature}")
+            print(f"Base string: {sig_basestring}")
+
         return is_valid
         
     except Exception as e:
