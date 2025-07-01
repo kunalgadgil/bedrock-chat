@@ -314,32 +314,62 @@ async def poll_for_response(message_id: str, conversation_id: str):
             try:
                 conversation = fetch_conversation(user.id, conversation_id)
 
+                # Debug: Print conversation structure
+                print(f"Conversation found with {len(conversation.message_map)} messages")
+                print(f"Looking for message_id: {message_id}")
+                print(f"Available message IDs: {list(conversation.message_map.keys())}")
+                print(f"Last message ID: {getattr(conversation, 'last_message_id', 'N/A')}")
+                print(f"Should continue: {getattr(conversation, 'should_continue', 'N/A')}")
+
                 # Look for the response message (child of our input message)
                 input_message = conversation.message_map.get(message_id)
+                response_message = None
+
                 if input_message and input_message.children:
                     # Get the response message
                     response_message_id = input_message.children[0]
                     response_message = conversation.message_map.get(response_message_id)
+                    print(f"Found child message: {response_message_id}")
+                else:
+                    # Fallback: Look for the last assistant message in the conversation
+                    print(f"No children found for message {message_id}, looking for last assistant message")
+                    for msg_id, msg in conversation.message_map.items():
+                        if hasattr(msg, 'role') and msg.role == "assistant":
+                            response_message = msg
+                            print(f"Found assistant message: {msg_id}")
 
-                    if response_message and response_message.content:
-                        # Extract text from response content
-                        response_text = ""
-                        for content_block in response_message.content:
+                # Check if conversation is complete (not still generating)
+                is_complete = not getattr(conversation, 'should_continue', True)
+
+                if response_message and response_message.content and hasattr(response_message, 'role') and response_message.role == "assistant":
+                    # Extract text from response content
+                    response_text = ""
+                    for content_block in response_message.content:
+                        # Handle both dict and object formats
+                        if isinstance(content_block, dict):
+                            if content_block.get('contentType') == "text":
+                                response_text += content_block.get('body', '')
+                        else:
                             if hasattr(content_block, 'contentType') and content_block.contentType == "text":
                                 response_text += content_block.body
-                            elif hasattr(content_block, 'content_type') and content_block.content_type == "text":
-                                response_text += content_block.body
 
-                        if response_text.strip():
-                            # Send response to Slack
-                            await send_slack_response(context.channel, response_text)
+                    if response_text.strip() and is_complete:
+                        # Send response to Slack
+                        await send_slack_response(context.channel, response_text)
 
-                            # Mark as sent
-                            context.response_sent = True
-                            slack_context_store[message_id] = context
+                        # Mark as sent
+                        context.response_sent = True
+                        slack_context_store[message_id] = context
 
-                            print(f"Successfully sent response for message {message_id}")
-                            return
+                        print(f"Successfully sent response for message {message_id}")
+                        print(f"Response text length: {len(response_text)} characters")
+                        return
+                    elif response_text.strip() and not is_complete:
+                        print(f"Response found but still generating (should_continue: {getattr(conversation, 'should_continue', 'N/A')})")
+                    else:
+                        print(f"Response message found but no text content extracted")
+                else:
+                    print(f"No assistant response found yet")
 
             except Exception as fetch_error:
                 print(f"Error fetching conversation (attempt {attempt + 1}): {fetch_error}")
