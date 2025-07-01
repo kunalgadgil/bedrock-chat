@@ -11,6 +11,7 @@ import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as logs from "aws-cdk-lib/aws-logs";
+
 import { excludeDockerImage } from "./constants/docker";
 
 interface ApiPublishmentStackProps extends StackProps {
@@ -24,6 +25,8 @@ interface ApiPublishmentStackProps extends StackProps {
   readonly deploymentStage?: string;
   readonly largeMessageBucketName: string;
   readonly corsOptions?: apigateway.CorsOptions;
+  readonly slackBotToken?: string;
+  readonly slackSigningSecret?: string;
 }
 
 export class ApiPublishmentStack extends Stack {
@@ -99,6 +102,9 @@ export class ApiPublishmentStack extends Stack {
         BEDROCK_REGION: props.bedrockRegion,
         LARGE_MESSAGE_BUCKET: props.largeMessageBucketName,
         TABLE_ACCESS_ROLE_ARN: props.tableAccessRoleArn,
+        // Slack integration environment variables
+        SLACK_BOT_TOKEN: props.slackBotToken || "",
+        SLACK_SIGNING_SECRET: props.slackSigningSecret || "",
       },
       role: handlerRole,
       logRetention: logs.RetentionDays.THREE_MONTHS,

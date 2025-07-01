@@ -15,6 +15,7 @@ from app.routes.bot import router as bot_router
 from app.routes.bot_store import router as bot_store_router
 from app.routes.conversation import router as conversation_router
 from app.routes.published_api import router as published_api_router
+from app.routes.slack_webhook import router as slack_webhook_router
 from app.routes.user import router as user_router
 from app.user import User
 from app.utils import is_running_on_lambda
@@ -65,6 +66,7 @@ if not is_published_api:
     app.include_router(bot_store_router)
 else:
     app.include_router(published_api_router)
+    app.include_router(slack_webhook_router)
 
 
 app.add_middleware(

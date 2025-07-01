@@ -96,6 +96,12 @@ def create_bot_publication(user: User, bot_id: str, bot_publish_input: BotPublis
             str(bot_publish_input.allowed_origins).replace(" ", "").replace("'", '"')
         )
 
+    # Add Slack credentials if provided
+    if bot_publish_input.slack_bot_token is not None:
+        environment_variables["SLACK_BOT_TOKEN"] = bot_publish_input.slack_bot_token
+    if bot_publish_input.slack_signing_secret is not None:
+        environment_variables["SLACK_SIGNING_SECRET"] = bot_publish_input.slack_signing_secret
+
     # Create `ApiPublishmentStack` by CodeBuild
     try:
         build_id = start_codebuild_project(environment_variables=environment_variables)

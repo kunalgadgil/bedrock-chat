@@ -42,6 +42,8 @@ class BotPublishInput(BaseSchema):
     quota: PublishedApiQuota
     throttle: PublishedApiThrottle
     allowed_origins: list[str]
+    slack_bot_token: str | None = Field(None, description="Slack Bot User OAuth Token for Slack integration")
+    slack_signing_secret: str | None = Field(None, description="Slack App Signing Secret for webhook verification")
 
     @root_validator(pre=True)
     def validate_allowed_origins(cls, values):
