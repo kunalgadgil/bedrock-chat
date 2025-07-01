@@ -121,6 +121,10 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
         current_user.id.split("#")[1] if "#" in current_user.id else current_user.id
     )
 
+    print(f"Current user ID: {current_user.id}")
+    print(f"Extracted bot_id: {bot_id}")
+    print(f"User groups: {current_user.groups}")
+
     # Don't create conversation ID - let the system generate one
     # Generate message ID for tracking
     response_message_id = str(ULID())
@@ -161,10 +165,12 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
         )
 
         # Send to SQS for processing (same as published API)
-        _ = sqs_client.send_message(
+        sqs_response = sqs_client.send_message(
             QueueUrl=QUEUE_URL, MessageBody=chat_input.model_dump_json()
         )
         print(f"Sent message to SQS - Message ID: {response_message_id}, Conversation ID: {conversation_id}")
+        print(f"SQS Message ID: {sqs_response.get('MessageId')}")
+        print(f"Chat input payload: {chat_input.model_dump_json()[:200]}...")
 
         # Send immediate response to Slack
         await send_slack_response(channel, "Processing your request...")
@@ -289,6 +295,7 @@ def store_slack_context(message_id: str, channel: str, conversation_id: str, use
 async def poll_for_response(message_id: str, conversation_id: str):
     """Poll for AI response and send it back to Slack"""
     print(f"Starting polling for message {message_id} in conversation {conversation_id}")
+    print(f"Will poll for up to 60 seconds with 1-second intervals")
 
     max_attempts = 60  # Poll for up to 60 seconds
     poll_interval = 1  # Poll every 1 second
@@ -307,8 +314,8 @@ async def poll_for_response(message_id: str, conversation_id: str):
                 print(f"Response already sent for message {message_id}")
                 return
 
-            # Create a user object to fetch the conversation
-            user = User(id=context.bot_id, name="slack_bot", email="slack@bot.com", groups=[])
+            # Create a user object to fetch the conversation (same logic as published API)
+            user = User.from_published_api_id(context.bot_id)
 
             # Try to fetch the conversation to see if response is ready
             try:
@@ -372,7 +379,46 @@ async def poll_for_response(message_id: str, conversation_id: str):
                     print(f"No assistant response found yet")
 
             except Exception as fetch_error:
-                print(f"Error fetching conversation (attempt {attempt + 1}): {fetch_error}")
+                # Don't log "conversation not found" errors for the first few attempts
+                if "No conversation found" in str(fetch_error) and attempt < 5:
+                    print(f"Conversation not ready yet (attempt {attempt + 1}) - waiting for SQS processing")
+                else:
+                    print(f"Error fetching conversation (attempt {attempt + 1}): {fetch_error}")
+                    print(f"Conversation ID: {conversation_id}")
+                    print(f"User ID: {user.id}")
+                    print(f"Bot ID: {context.bot_id}")
+
+                    # Try to list conversations for this user to see if any exist
+                    if attempt == 10:  # Only do this once to avoid spam
+                        try:
+                            from app.usecases.conversation import find_conversations_by_user_id
+                            conversations = find_conversations_by_user_id(user.id, limit=10)
+                            print(f"Found {len(conversations)} conversations for user {user.id}")
+
+                            # Look for conversations created in the last 5 minutes
+                            import time
+                            current_time = time.time() * 1000  # Convert to milliseconds
+                            recent_conversations = [
+                                conv for conv in conversations
+                                if (current_time - conv.create_time) < 300000  # 5 minutes
+                            ]
+
+                            print(f"Recent conversations (last 5 min): {len(recent_conversations)}")
+                            for conv in recent_conversations:
+                                print(f"  - Recent: {conv.id} (created: {conv.create_time})")
+
+                            # Check if our specific conversation might have been created with a different ID
+                            if recent_conversations:
+                                print("🔍 Checking if any recent conversation matches our message...")
+                                for conv in recent_conversations:
+                                    if hasattr(conv, 'message_map') and conv.message_map:
+                                        for msg_id, msg in conv.message_map.items():
+                                            if (hasattr(msg, 'role') and msg.role == 'user' and
+                                                hasattr(msg, 'content') and msg.content):
+                                                print(f"    Found user message in {conv.id}: {msg_id}")
+
+                        except Exception as list_error:
+                            print(f"Error listing conversations: {list_error}")
                 # Continue polling
 
             # Wait before next poll
@@ -470,8 +516,10 @@ def slack_status():
     pending_contexts = [
         {
             "message_id": msg_id,
+            "conversation_id": ctx.conversation_id,
             "channel": ctx.channel,
             "user": ctx.user,
+            "bot_id": ctx.bot_id,
             "timestamp": ctx.timestamp.isoformat(),
             "response_sent": ctx.response_sent,
             "age_seconds": (datetime.now() - ctx.timestamp).total_seconds()
@@ -483,5 +531,9 @@ def slack_status():
         "total_contexts": len(slack_context_store),
         "pending_responses": len([ctx for ctx in slack_context_store.values() if not ctx.response_sent]),
         "completed_responses": len([ctx for ctx in slack_context_store.values() if ctx.response_sent]),
+        "sqs_queue_url": QUEUE_URL,
+        "slack_model": SLACK_MODEL,
+        "slack_bot_token_set": bool(SLACK_BOT_TOKEN),
+        "slack_signing_secret_set": bool(SLACK_SIGNING_SECRET),
         "contexts": pending_contexts
     }
