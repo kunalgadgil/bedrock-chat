@@ -146,8 +146,8 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
     )
 
     try:
-        # Follow the published API pattern: generate conversation ID if not provided
-        conversation_id = str(ULID())  # Generate new conversation ID (same as published API)
+        # Follow the published API pattern exactly
+        conversation_id = str(ULID())  # Generate new conversation ID
 
         # Create ChatInput for SQS (same format as published API)
         chat_input = ChatInput(
@@ -170,16 +170,15 @@ async def handle_slack_event(request: Request, slack_event: Dict[str, Any], back
         )
         print(f"Sent message to SQS - Message ID: {response_message_id}, Conversation ID: {conversation_id}")
         print(f"SQS Message ID: {sqs_response.get('MessageId')}")
-        print(f"Chat input payload: {chat_input.model_dump_json()[:200]}...")
 
         # Send immediate response to Slack
         await send_slack_response(channel, "Processing your request...")
 
-        # Store the context for later response (use the generated conversation_id)
+        # Store the context for polling (same as published API pattern)
         store_slack_context(response_message_id, channel, conversation_id, user, bot_id)
 
-        # Start background polling for this specific message
-        background_tasks.add_task(poll_for_response, response_message_id, conversation_id)
+        # Start polling in background task (like published API client would do)
+        background_tasks.add_task(poll_slack_response, response_message_id, conversation_id, channel, bot_id)
 
     except Exception as e:
         print(f"Error processing Slack message: {str(e)}")
@@ -292,211 +291,107 @@ def store_slack_context(message_id: str, channel: str, conversation_id: str, use
     print(f"Stored context for message {message_id}: {context}")
 
 
-async def poll_for_response(message_id: str, conversation_id: str):
-    """Poll for AI response and send it back to Slack"""
-    print(f"Starting polling for message {message_id} in conversation {conversation_id}")
-    print(f"Will poll for up to 60 seconds with 1-second intervals")
+async def poll_slack_response(message_id: str, conversation_id: str, channel: str, bot_id: str):
+    """Poll for AI response using the same logic as published API clients"""
+    print(f"Starting polling for Slack response - Message: {message_id}, Conversation: {conversation_id}")
 
-    max_attempts = 60  # Poll for up to 60 seconds
+    max_attempts = 30  # Poll for up to 30 seconds (like a typical API client)
     poll_interval = 1  # Poll every 1 second
 
     for attempt in range(max_attempts):
         try:
-            print(f"Polling attempt {attempt + 1}/{max_attempts} for message {message_id}")
+            print(f"Polling attempt {attempt + 1}/{max_attempts}")
 
-            # Get context
+            # Check if already sent
             context = slack_context_store.get(message_id)
-            if not context:
-                print(f"Context not found for message {message_id}")
-                return
-
-            if context.response_sent:
+            if context and context.response_sent:
                 print(f"Response already sent for message {message_id}")
                 return
 
-            # Create a user object to fetch the conversation (same logic as published API)
-            user = User.from_published_api_id(context.bot_id)
+            # Create user object (same as published API)
+            user = User.from_published_api_id(bot_id)
 
-            # Try to fetch the conversation to see if response is ready
+            # Try to get the message using published API logic
             try:
                 conversation = fetch_conversation(user.id, conversation_id)
-
-                # Debug: Print conversation structure
-                print(f"Conversation found with {len(conversation.message_map)} messages")
-                print(f"Looking for message_id: {message_id}")
-                print(f"Available message IDs: {list(conversation.message_map.keys())}")
-                print(f"Last message ID: {getattr(conversation, 'last_message_id', 'N/A')}")
-                print(f"Should continue: {getattr(conversation, 'should_continue', 'N/A')}")
-
-                # Look for the response message (child of our input message)
                 input_message = conversation.message_map.get(message_id)
-                response_message = None
 
-                if input_message and input_message.children:
-                    # Get the response message
-                    response_message_id = input_message.children[0]
-                    response_message = conversation.message_map.get(response_message_id)
-                    print(f"Found child message: {response_message_id}")
-                else:
-                    # Fallback: Look for the last assistant message in the conversation
-                    print(f"No children found for message {message_id}, looking for last assistant message")
-                    for msg_id, msg in conversation.message_map.items():
-                        if hasattr(msg, 'role') and msg.role == "assistant":
-                            response_message = msg
-                            print(f"Found assistant message: {msg_id}")
+                if input_message is None:
+                    print(f"Input message {message_id} not found yet")
+                    await asyncio.sleep(poll_interval)
+                    continue
 
-                # Check if conversation is complete (not still generating)
-                is_complete = not getattr(conversation, 'should_continue', True)
+                # Check if response message exists (same logic as published API)
+                if not input_message.children:
+                    print(f"No response message yet for {message_id}")
+                    await asyncio.sleep(poll_interval)
+                    continue
 
-                if response_message and response_message.content and hasattr(response_message, 'role') and response_message.role == "assistant":
-                    # Extract text from response content
-                    response_text = ""
-                    for content_block in response_message.content:
-                        # Handle both dict and object formats
-                        if isinstance(content_block, dict):
-                            if content_block.get('contentType') == "text":
-                                response_text += content_block.get('body', '')
-                        else:
-                            if hasattr(content_block, 'contentType') and content_block.contentType == "text":
-                                response_text += content_block.body
+                output_message_id = input_message.children[0]
+                output_message = conversation.message_map.get(output_message_id)
 
-                    if response_text.strip() and is_complete:
-                        # Send response to Slack
-                        await send_slack_response(context.channel, response_text)
+                if output_message is None:
+                    print(f"Output message {output_message_id} not found yet")
+                    await asyncio.sleep(poll_interval)
+                    continue
 
-                        # Mark as sent
+                # Extract response text
+                response_text = ""
+                for content_block in output_message.content:
+                    if isinstance(content_block, dict):
+                        if content_block.get('contentType') == "text":
+                            response_text += content_block.get('body', '')
+                    else:
+                        if hasattr(content_block, 'contentType') and content_block.contentType == "text":
+                            response_text += content_block.body
+
+                if response_text.strip():
+                    # Send response to Slack
+                    await send_slack_response(channel, response_text)
+
+                    # Mark as sent
+                    if context:
                         context.response_sent = True
                         slack_context_store[message_id] = context
 
-                        print(f"Successfully sent response for message {message_id}")
-                        print(f"Response text length: {len(response_text)} characters")
-                        return
-                    elif response_text.strip() and not is_complete:
-                        print(f"Response found but still generating (should_continue: {getattr(conversation, 'should_continue', 'N/A')})")
-                    else:
-                        print(f"Response message found but no text content extracted")
+                    print(f"Successfully sent Slack response for message {message_id}")
+                    return
                 else:
-                    print(f"No assistant response found yet")
+                    print(f"Response message found but no text content")
 
             except Exception as fetch_error:
-                # Don't log "conversation not found" errors for the first few attempts
-                if "No conversation found" in str(fetch_error) and attempt < 15:
-                    print(f"Conversation not ready yet (attempt {attempt + 1}) - waiting for SQS processing")
+                if "No conversation found" in str(fetch_error):
+                    print(f"Conversation not ready yet (attempt {attempt + 1})")
                 else:
-                    print(f"Error fetching conversation (attempt {attempt + 1}): {fetch_error}")
-                    print(f"Conversation ID: {conversation_id}")
-                    print(f"User ID: {user.id}")
-                    print(f"Bot ID: {context.bot_id}")
+                    print(f"Error fetching conversation: {fetch_error}")
 
-                    # Try to list conversations for this user to see if any exist
-                    if attempt == 20:  # Only do this once to avoid spam
-                        try:
-                            from app.usecases.conversation import find_conversations_by_user_id
-                            conversations = find_conversations_by_user_id(user.id, limit=10)
-                            print(f"Found {len(conversations)} conversations for user {user.id}")
-
-                            # Look for conversations created in the last 5 minutes
-                            import time
-                            current_time = time.time() * 1000  # Convert to milliseconds
-                            recent_conversations = [
-                                conv for conv in conversations
-                                if (current_time - conv.create_time) < 300000  # 5 minutes
-                            ]
-
-                            print(f"Recent conversations (last 5 min): {len(recent_conversations)}")
-                            for conv in recent_conversations:
-                                print(f"  - Recent: {conv.id} (created: {conv.create_time})")
-
-                            # Check if our specific conversation might have been created with a different ID
-                            if recent_conversations:
-                                print("🔍 Checking if any recent conversation matches our message...")
-                                for conv in recent_conversations:
-                                    if hasattr(conv, 'message_map') and conv.message_map:
-                                        for msg_id, msg in conv.message_map.items():
-                                            if (hasattr(msg, 'role') and msg.role == 'user' and
-                                                hasattr(msg, 'content') and msg.content):
-                                                print(f"    Found user message in {conv.id}: {msg_id}")
-
-                        except Exception as list_error:
-                            print(f"Error listing conversations: {list_error}")
-                # Continue polling
-
-            # Wait before next poll
             await asyncio.sleep(poll_interval)
 
         except Exception as e:
             print(f"Error in polling attempt {attempt + 1}: {str(e)}")
             await asyncio.sleep(poll_interval)
 
-    # If we get here, polling timed out
+    # Timeout - send timeout message
+    print(f"Polling timed out for message {message_id}")
+    await send_slack_response(channel, "⏰ Sorry, the request timed out. Please try again.")
+
+    # Mark as sent to prevent further attempts
     context = slack_context_store.get(message_id)
-    if context and not context.response_sent:
-        await send_slack_response(
-            context.channel,
-            "⏰ Sorry, the request timed out. Please try again."
-        )
+    if context:
         context.response_sent = True
         slack_context_store[message_id] = context
 
-    print(f"Polling timed out for message {message_id}")
 
 
-@router.post("/slack/poll-response")
-async def poll_and_respond(request: Request):
-    """Manually poll for AI responses and send them back to Slack"""
-    processed_count = 0
-    pending_count = 0
 
-    # Get all pending contexts
-    for message_id, context in slack_context_store.items():
-        if not context.response_sent:
-            pending_count += 1
 
-            # Check if response is ready
-            try:
-                user = User(id=context.bot_id, name="slack_bot", email="slack@bot.com", groups=[])
-                conversation = fetch_conversation(user.id, context.conversation_id)
 
-                input_message = conversation.message_map.get(message_id)
-                if input_message and input_message.children:
-                    response_message_id = input_message.children[0]
-                    response_message = conversation.message_map.get(response_message_id)
 
-                    if response_message and response_message.content:
-                        # Extract text from response content
-                        response_text = ""
-                        for content_block in response_message.content:
-                            if hasattr(content_block, 'contentType') and content_block.contentType == "text":
-                                response_text += content_block.body
-                            elif hasattr(content_block, 'content_type') and content_block.content_type == "text":
-                                response_text += content_block.body
 
-                        if response_text.strip():
-                            # Send response to Slack
-                            await send_slack_response(context.channel, response_text)
 
-                            # Mark as sent
-                            context.response_sent = True
-                            processed_count += 1
 
-            except Exception as e:
-                print(f"Error processing message {message_id}: {str(e)}")
 
-    # Clean up old contexts (older than 1 hour)
-    cutoff_time = datetime.now() - timedelta(hours=1)
-    old_message_ids = [
-        msg_id for msg_id, ctx in slack_context_store.items()
-        if ctx.timestamp < cutoff_time
-    ]
-    for msg_id in old_message_ids:
-        del slack_context_store[msg_id]
 
-    return {
-        "status": "completed",
-        "processed_responses": processed_count,
-        "pending_responses": pending_count - processed_count,
-        "cleaned_old_contexts": len(old_message_ids)
-    }
 
 
 @router.get("/slack/health")
@@ -507,6 +402,53 @@ def slack_health():
         "slack_bot_token_set": bool(SLACK_BOT_TOKEN),
         "slack_signing_secret_set": bool(SLACK_SIGNING_SECRET),
         "queue_url_set": bool(QUEUE_URL)
+    }
+
+
+@router.post("/slack/check-all-pending")
+async def check_all_pending_responses():
+    """Check all pending responses and send them to Slack (manual trigger)"""
+    processed = 0
+    errors = 0
+
+    for message_id, context in slack_context_store.items():
+        if not context.response_sent:
+            try:
+                # Use the same logic as published API to check for response
+                user = User.from_published_api_id(context.bot_id)
+                conversation = fetch_conversation(user.id, context.conversation_id)
+                input_message = conversation.message_map.get(message_id)
+
+                if input_message and input_message.children:
+                    output_message_id = input_message.children[0]
+                    output_message = conversation.message_map.get(output_message_id)
+
+                    if output_message and output_message.content:
+                        # Extract response text
+                        response_text = ""
+                        for content_block in output_message.content:
+                            if isinstance(content_block, dict):
+                                if content_block.get('contentType') == "text":
+                                    response_text += content_block.get('body', '')
+                            else:
+                                if hasattr(content_block, 'contentType') and content_block.contentType == "text":
+                                    response_text += content_block.body
+
+                        if response_text.strip():
+                            await send_slack_response(context.channel, response_text)
+                            context.response_sent = True
+                            slack_context_store[message_id] = context
+                            processed += 1
+
+            except Exception as e:
+                print(f"Error checking message {message_id}: {str(e)}")
+                errors += 1
+
+    return {
+        "status": "completed",
+        "processed": processed,
+        "errors": errors,
+        "total_pending": len([ctx for ctx in slack_context_store.values() if not ctx.response_sent])
     }
 
 
