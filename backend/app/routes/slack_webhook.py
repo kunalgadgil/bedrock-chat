@@ -380,7 +380,7 @@ async def poll_for_response(message_id: str, conversation_id: str):
 
             except Exception as fetch_error:
                 # Don't log "conversation not found" errors for the first few attempts
-                if "No conversation found" in str(fetch_error) and attempt < 5:
+                if "No conversation found" in str(fetch_error) and attempt < 15:
                     print(f"Conversation not ready yet (attempt {attempt + 1}) - waiting for SQS processing")
                 else:
                     print(f"Error fetching conversation (attempt {attempt + 1}): {fetch_error}")
@@ -389,7 +389,7 @@ async def poll_for_response(message_id: str, conversation_id: str):
                     print(f"Bot ID: {context.bot_id}")
 
                     # Try to list conversations for this user to see if any exist
-                    if attempt == 10:  # Only do this once to avoid spam
+                    if attempt == 20:  # Only do this once to avoid spam
                         try:
                             from app.usecases.conversation import find_conversations_by_user_id
                             conversations = find_conversations_by_user_id(user.id, limit=10)
